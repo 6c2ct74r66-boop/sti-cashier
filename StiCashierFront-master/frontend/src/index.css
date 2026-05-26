@@ -1,0 +1,21 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.sti-gradient {
+  background: linear-gradient(135deg, #003A8F 0%, #002266 100%);
+}
+
+.sti-gold-gradient {
+  background: linear-gradient(135deg, #FFC72C 0%, #E6A800 100%);
+}
+
+.card-hover {
+  @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+}

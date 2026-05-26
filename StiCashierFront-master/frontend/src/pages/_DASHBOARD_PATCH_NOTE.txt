@@ -1,0 +1,1 @@
+Patch: added showActiveStudents function and "Show Active Students" button in Dashboard.jsx near student search form. Intention: clear filters and fetch active (archived=false) students.
