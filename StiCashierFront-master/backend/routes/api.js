@@ -137,7 +137,8 @@ app.get('/api/students', authenticateToken, async (req, res) => {
       params.push(status);
     }
 
-    query += ' ORDER BY s.created_at DESC';
+    // Alphabetical order (A-Z) by student name
+    query += ' ORDER BY s.last_name ASC, s.first_name ASC, s.middle_name ASC NULLS LAST, s.suffix ASC NULLS LAST';
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
@@ -269,10 +270,10 @@ app.post('/api/students', authenticateToken, async (req, res) => {
       // Create user account
       const tempPassword = await bcrypt.hash(student_number, 10);
       const userResult = await client.query(`
-        INSERT INTO users (username, password, role, full_name, email, student_id, balance)
-        VALUES ($1, $2, 'student', $3, $4, $5, 0)
+        INSERT INTO users (username, password, role, full_name, sex, year, email, student_id, balance, created_at, archived)
+        VALUES ($1, $2, 'student', $3, $4, $5, $6, $7, $8)
         RETURNING id
-      `, [student_number, tempPassword, `${first_name} ${last_name}`, email, student_number]);
+      `, [student_number, tempPassword, `${first_name} ${last_name}`, gender, year, email, student_number, balance, created_at, arcived]);
 
       const user_id = userResult.rows[0].id;
 

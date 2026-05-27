@@ -193,6 +193,9 @@ export default function Dashboard() {
   };
 
   const fetchTransactions = async () => {
+    // Hide purchases/top-up from UI as requested.
+    // We still keep the route call for now, but we will filter them out.
+
     try {
       const res = await fetch('/api/transactions', {
         headers: { Authorization: `Bearer ${token}` }
@@ -203,7 +206,11 @@ export default function Dashboard() {
         return;
       }
       const data = await res.json();
-      setTransactions(Array.isArray(data) ? data : []);
+      const all = Array.isArray(data) ? data : [];
+      // Filter out purchases and top-ups from the UI.
+      // The History tab is intended to be hidden for these records.
+      const filtered = all.filter(txn => txn.type !== 'purchase' && txn.type !== 'topup');
+      setTransactions(filtered);
     } catch (err) {
       console.error('Error fetching transactions:', err);
       setTransactions([]);
@@ -1400,11 +1407,13 @@ export default function Dashboard() {
                             <option value="All">All</option>
                             {(appConfig?.courses?.length
                               ? appConfig.courses
-                              : Array.from(new Set(studentResults.map(s => s.course).filter(Boolean))).sort()
-                            ).map(course => (
-                              <option key={course} value={course}>{course}</option>
-                            ))}
-                          </select>
+                              : Array.from(new Set(studentResults.map(s => s.course).filter(Boolean))))
+                              .slice()
+                              .sort((a, b) => String(a).localeCompare(String(b)))
+                              .map(course => (
+                                <option key={course} value={course}>{course}</option>
+                              ))}
+                         </select>
                         </label>
                         <label className="block">
                           <span className="text-xs text-gray-500 uppercase">Year</span>
@@ -1500,7 +1509,7 @@ export default function Dashboard() {
                           <div>
                             <p className="text-sm uppercase tracking-[.3em] text-gray-500">Student Information</p>
                             <h3 className="text-xl font-semibold text-gray-900 mt-2">{selectedStudent.first_name} {selectedStudent.last_name}</h3>
-                            <p className="text-sm text-gray-500">{selectedStudent.course} • Year {selectedStudent.year_level}</p>
+                            <p className="text-sm text-gray-500">{selectedStudent.course}  Year {selectedStudent.year_level}</p>
                           </div>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
@@ -2072,7 +2081,29 @@ function AdminUsers({ token, showMessage }) {
   const [users, setUsers] = useState([]);
   const [archivedUsers, setArchivedUsers] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ username: '', password: '', role: 'student', fullName: '', email: '', studentId: '' });
+  const [form, setForm] = useState({
+    username: '',
+    password: '',
+    role: 'student',
+    // admin-friendly
+    fullName: '',
+    // student-friendly
+    first_name: '',
+    last_name: '',
+    middle_name: '',
+    email: '',
+    studentId: '',
+    year_level: '',
+    course: '',
+    course_other: '',
+    gender: '',
+    birthdate: '',
+    contact_number: '',
+    address: '',
+    guardian_name: '',
+    guardian_contact: '',
+    balance: ''
+  });
   const [registerError, setRegisterError] = useState('');
   const [error, setError] = useState(null);
 
@@ -2117,16 +2148,17 @@ function AdminUsers({ token, showMessage }) {
     e.preventDefault();
 
     try {
-      // Backend expects: { username, password, role, fullName, email, studentId, initialBalance? }
+      // Backend expects: { username, password, role, fullName, email, studentId, ... }
+      // Backend will upsert to `students` when role === 'student'.
       const payload = {
         username: form.username,
         password: form.password,
         role: form.role,
-        fullName: form.fullName,
+        fullName: form.fullName || [form.first_name, form.middle_name, form.last_name].filter(Boolean).join(' '),
         email: form.email,
         studentId: form.studentId,
 
-        // extra fields for student profile (optional)
+        // student profile fields
         contact_number: form.contact_number,
         gender: form.gender,
         birthdate: form.birthdate,
@@ -2135,7 +2167,6 @@ function AdminUsers({ token, showMessage }) {
         guardian_contact: form.guardian_contact,
         year_level: form.year_level,
         course: form.course,
-        semester: form.semester,
       };
 
       const res = await fetch('http://localhost:5000/api/auth/register', {
@@ -2149,7 +2180,7 @@ function AdminUsers({ token, showMessage }) {
       if (res.ok) {
         setRegisterError('');
         showMessage('success', 'User created!');
-        setForm({ username: '', password: '', role: 'student', fullName: '', email: '', studentId: '' });
+        setForm({ username: '', password: '', role: 'student', fullName: '', first_name: '', last_name: '', middle_name: '', email: '', studentId: '', year_level: '', course: '', gender: '', birthdate: '', contact_number: '', address: '', guardian_name: '', guardian_contact: '', balance: '' });
         setShowForm(false);
         // After creating a student user, refresh data.
         // Students list is already refreshed by activeTab effects, so we only refresh users here.
@@ -2196,23 +2227,42 @@ function AdminUsers({ token, showMessage }) {
         </button>
       </div>
 
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-gray-50 p-4 rounded-lg mb-6 grid grid-cols-2 gap-4">
-          <input placeholder="Username" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} className="px-3 py-2 border rounded" required />
-          <input placeholder="Password" type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className="px-3 py-2 border rounded" required />
-          <input placeholder="Full Name" value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} className="px-3 py-2 border rounded" required />
-          <input placeholder="Email" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="px-3 py-2 border rounded" />
-        <input placeholder="Student ID" value={form.studentId} onChange={e => setForm({ ...form, studentId: e.target.value })} className="px-3 py-2 border rounded" required />
-          <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} className="px-3 py-2 border rounded">
-            <option value="student">Student</option>
-            <option value="admin">Admin</option>
-          </select>
-          <div className="col-span-2 flex gap-2">
-            <button type="submit" className="bg-sti-blue text-white px-4 py-2 rounded">Create User</button>
-            <button type="button" onClick={() => setShowForm(false)} className="bg-gray-300 px-4 py-2 rounded">Cancel</button>
-          </div>
-        </form>
-      )}
+     {showForm && (
+  <form onSubmit={handleSubmit} className="bg-gray-50 p-4 rounded-lg mb-6 grid grid-cols-2 gap-4">
+    <input placeholder="Username" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} className="px-3 py-2 border rounded" required />
+    <input placeholder="Password" type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className="px-3 py-2 border rounded" required />
+    <input placeholder="Full Name" value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} className="px-3 py-2 border rounded" required />
+    <input placeholder="Email" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="px-3 py-2 border rounded" />
+    <input placeholder="Student ID" value={form.studentId} onChange={e => setForm({ ...form, studentId: e.target.value })} className="px-3 py-2 border rounded" required />
+    
+    <select value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })} className="px-3 py-2 border rounded">
+      <option value="">Select Gender</option>
+      <option value="male">Male</option>
+      <option value="female">Female</option>
+      <option value="other">Other</option>
+    </select>
+    <input placeholder="Contact Number" type="tel" value={form.contact_number} onChange={e => setForm({ ...form, contact_number: e.target.value })} className="px-3 py-2 border rounded" />
+    <input placeholder="Year Level" type="number" value={form.year_level} onChange={e => setForm({ ...form, year_level: e.target.value })} className="px-3 py-2 border rounded" />
+    <input
+      placeholder="Course"
+      value={form.course}
+      onChange={e => setForm({ ...form, course: e.target.value })}
+      className="px-3 py-2 border rounded"
+    />
+
+    <input placeholder="Balance" type="number" step="0.01" value={form.balance} onChange={e => setForm({ ...form, balance: e.target.value })} className="px-3 py-2 border rounded" />
+
+    <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} className="px-3 py-2 border rounded">
+      <option value="student">Student</option>
+      <option value="admin">Admin</option>
+    </select>
+
+    <div className="col-span-2 flex gap-2">
+      <button type="submit" className="bg-sti-blue text-white px-4 py-2 rounded">Create User</button>
+      <button type="button" onClick={() => setShowForm(false)} className="bg-gray-300 px-4 py-2 rounded">Cancel</button>
+    </div>
+  </form>
+)}
 
       {registerError && (
         <div className="mb-4 rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700">

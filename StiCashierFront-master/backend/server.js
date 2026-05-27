@@ -357,7 +357,8 @@ app.get('/api/students', authenticateToken, async (req, res) => {
       params.push(status);
     }
 
-    query += ' ORDER BY s.created_at DESC';
+    // Alphabetical order (A-Z) by student name
+    query += ' ORDER BY s.last_name ASC, s.first_name ASC, s.middle_name ASC NULLS LAST, s.suffix ASC NULLS LAST';
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
